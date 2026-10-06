@@ -78,7 +78,31 @@
 **Required evidence**:
 - Logic: `tests/unit/settlement/[story-slug]_test.[ext]` — must exist and pass（`/story-done` 只检查它**存在**；通过与否由 `/gate-check` / `/smoke-check` 判定，两者都在更后面）
 
-**Status**: [ ] Not yet created
+**Status**: [x] Evidence recorded 2026-10-06 — see below
+
+**Test evidence: waived** at `qa.level: minimal` — no test was required or written for this story.
+
+**What was actually run instead** (the substitutes that did happen, named so a
+minimal-tier summary is not mistaken for a standard-tier one where tests were forgotten):
+
+1. **Compile**: `UnrealBuildTool ReactorEditor Win64 Development` → `Result: Succeeded`, exit 0, 29.4s.
+   Three compile/link failures were found and fixed on the way (module include path,
+   `FAutoConsoleCommandWithArgs` does not exist in 5.8, missing `Json` module dependency).
+2. **Behavioural isolation**: `Reactor.DumpSimulationState` — one lone cell per substance,
+   stepped twice: all 5 survive (`changed=0`). Before the double-buffer fix this reported
+   `0 distinct non-empty` after one step, which is how the bug was caught.
+3. **Settling behaviour**: seeded grid of ~7,200 cells per substance → step 1 changes
+   9,820 cells with 9,820 reaction matches; the table then reaches equilibrium. Recorded,
+   not hidden: this reaction table is all merge rules, so one step consumes every reachable
+   pair. Sustained activity is the rule table's job (story-002), not this table's.
+4. **Performance**: `Reactor.BenchmarkSimulation 0 30` and `... 3 30` → the numbers now in
+   `project.yaml`'s `performance` block.
+
+**Why there is no unit test file**: `qa.level: minimal` waives tests (dev-story CONTRACT.md
+L50/L68). The determinism criterion below is therefore **not yet mechanically enforced** —
+that is the honest state, and it is the first thing a later tier should pick up.
+
+**In-repo evidence document**: `docs/simulation/kernel-story-001-evidence.md`
 
 ---
 

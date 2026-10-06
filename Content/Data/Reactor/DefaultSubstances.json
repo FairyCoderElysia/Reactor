@@ -1,0 +1,89 @@
+{
+	"_comment": "Reactor settlement tables. Editing this file must NOT require a recompile — that is the whole point of the data-driven architecture note in production/handoff-2026-10-05.md. Loaded at run time by FSubstanceTable::LoadFromJsonFile.",
+	"_format": {
+		"substances": "id is required. bIsPrimitive defaults to TRUE when absent — an id that forgot to declare itself must never become a non-terminating recursion branch. color is a placeholder only; real art is out of scope (see design/game-brief.md).",
+		"reactions": "a and b are an ORDERED pair, matched as written. resultA is what the first cell becomes; omit it to destroy that cell. resultB plus produceB=true keeps the second cell; produceB=false (the default) is merge semantics — the pair collapses into one cell.",
+		"params": "All tunables live here so rule iteration costs no recompile. workMultiplier is a MEASUREMENT-ONLY stress knob and must stay 0 in any shipped config; see FSimulationParams."
+	},
+
+	"params": {
+		"gridWidth": 256,
+		"gridHeight": 256,
+		"fixedStepSeconds": 0.0166667,
+		"maxStepsPerFrame": 8,
+		"reactionRateScale": 1.0,
+		"workMultiplier": 0
+	},
+
+	"substances": [
+		{
+			"id": "Water",
+			"displayName": "水",
+			"color": "#3A7BD5",
+			"bIsPrimitive": true
+		},
+		{
+			"id": "Stone",
+			"displayName": "石",
+			"color": "#8A8A8A",
+			"bIsPrimitive": true
+		},
+		{
+			"id": "Fire",
+			"displayName": "火",
+			"color": "#FF6B35",
+			"bIsPrimitive": true
+		},
+		{
+			"id": "Steam",
+			"displayName": "蒸汽",
+			"color": "#D8E4F0",
+			"bIsPrimitive": false
+		},
+		{
+			"id": "Lava",
+			"displayName": "熔岩",
+			"color": "#D7263D",
+			"bIsPrimitive": false
+		}
+	],
+
+	"reactions": [
+		{
+			"a": "Water",
+			"b": "Fire",
+			"resultA": "Steam",
+			"produceB": false
+		},
+		{
+			"a": "Fire",
+			"b": "Water",
+			"resultA": "Steam",
+			"produceB": false
+		},
+		{
+			"a": "Stone",
+			"b": "Fire",
+			"resultA": "Lava",
+			"produceB": false
+		},
+		{
+			"a": "Fire",
+			"b": "Stone",
+			"resultA": "Lava",
+			"produceB": false
+		},
+		{
+			"a": "Water",
+			"b": "Stone",
+			"resultA": "Water",
+			"produceB": false
+		},
+		{
+			"a": "Stone",
+			"b": "Water",
+			"resultA": "Stone",
+			"produceB": false
+		}
+	]
+}

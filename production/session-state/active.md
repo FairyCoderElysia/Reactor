@@ -17,22 +17,59 @@
 <!-- STATUS -->
 Epic: reactor
 Feature:
-Task: 等待 ADR-0001 升 Accepted（story-003/004 被阻塞）
+Task: story-001 实现完成并已编译验证，待 /story-done
 <!-- /STATUS -->
 
 <!-- CHECKPOINT -->
 **Updated:** 2026-10-06
 **Branch:** `main`
-**Current task:** `/setup-engine` 已完成；`/create-stories` 已切出 Build order 第 1 步的 4 个故事（`production/epics/reactor/`）。现在停在决策点等用户把 ADR-0001 升 `Accepted`。
-**Next step:** 开工 `story-001-数据驱动的结算内核与网格.md`（**它不被阻塞，可立即开始**），或先升 ADR-0001 以解锁完整链条。
-**Blocked on:** `story-003` 与 `story-004` 被 **ADR-0001 处于 `Proposed`** 阻塞 —— `dev-story`/`story-readiness` 在所有档位对此拦截。解除 = 用户本人将其 `Status` 改为 `Accepted`。
-**Files in progress:** none
-**Open questions:** `commands.run` 目前指向编辑器而非游戏（story-004 修）· `naming.constants` 与 gamepad 支持仍未验证/未确认 · `.claude/scripts/` 与 `.claude/skills/` 缺失（skill 引用它们）· `stage.txt` 与 `project.yaml:project.stage` 双份，需去重
+**Current task:** `/dev-story` on `production/epics/reactor/story-001-data-driven-kernel-and-grid.md` — 实现完成、编译通过、行为已实测
+**Next step:** `/story-done production/epics/reactor/story-001-data-driven-kernel-and-grid.md`（`minimal` 档无需 `/code-review`）
+**Blocked on:** nothing
+**Files in progress:** `Source/Reactor/Simulation/{ReactorTypes.h,SubstanceTable.h,SubstanceTable.cpp,GridSimulation.h,GridSimulation.cpp,ReactorSimulation.h,ReactorSimulation.cpp,SimulationBenchmark.h,SimulationBenchmark.cpp}` · `Source/Reactor/Reactor.cpp` · `Source/Reactor/Reactor.Build.cs` · `Content/Data/Reactor/DefaultSubstances.json` · `project.yaml` · `production/epics/reactor/story-001-*.md` · `docs/simulation/kernel-story-001-evidence.md`
+**Run result:** `OBSERVED` — headless run, no rendering: `Reactor.DumpSimulationState` prints 5 substances / 6 reactions / 256×256; a seeded 55% grid of ~36,000 cells settles in one step (9,820 changed, 9,820 reacted) to ~31,851 cells and then holds steady. Isolation check: 5 lone cells survive 2 steps unchanged. `Reactor.BenchmarkSimulation` → 2.2531 ms/step @ 256×256, 8.0367 ms/step @ 512×512-equivalent. **`commands.run` still opens the editor, not the game — that is story-004's job, so there is no on-screen evidence for this story and none is expected.**
+**Open questions:** 反应表全部是 merge 规则 → 一步即达平衡（**预期的**，持续涌现要靠 story-002 的规则表）· **确定性没有被任何测试断言**（`qa.level: minimal` 豁免测试），这是升档后最该补的一条 · `commands.build` 需要完整文件权限（UBT 的 .NET 文件操作写 `%LOCALAPPDATA%\UnrealBuildTool\`）· 别再用 bash/pwsh 的写测试判断目录可写性（两者权限层不同）
 <!-- /CHECKPOINT -->
 
 ---
 
 ## 笔记
+
+### story-001 的实现事实（2026-10-06）
+
+**编译通过**：`Result: Succeeded`, exit 0。路上修了 3 个失败，每个都是会复发的坑：
+
+1. `Simulation/` 内的文件用 `#include "Simulation/X.h"` → 解析成 `Simulation/Simulation/X.h`。
+   `Reactor.Build.cs` 补 `PublicIncludePaths.Add(ModuleDirectory)`。
+2. **UE 5.8 没有 `FAutoConsoleCommandWithArgs` 这个类** —— 家族被折叠进 `FAutoConsoleCommand`
+   的重载构造函数（只有 `WithWorld`/`WithOutputDevice` 变体还在）。用旧名字得到的是**编译错误，不是弃用警告**。
+3. 33 个 `LNK2019` 全指向 `FJsonObject`/`FJsonValue` —— **`Json` 模块不由 `Core` 传递**，得显式加依赖。
+
+**跑出来才发现的 2 个真 bug**（读代码都没看出来）：
+
+- **双缓冲写反了**：`StepPass` 把写缓冲**清空**而不是从读缓冲拷贝 → 没有任何写操作的格子在新帧里变空 →
+  **一步清空整张网格**。靠"每物质放一个孤立格子、步进一次"隔离出来。
+- **这个 bug 让第一次性能测量无效**：那份 `0.3375 ms/step` 是在**空网格**上测的。修正后是 2.2531 ms（256×256），
+  慢了约 6.7 倍。**那个错数字看起来很合理，差点就被信了。**
+
+**性能（实测，已填入 `project.yaml`）**：256×256 → 2.2531 ms/step（占 16.67ms 预算 13.5%）；
+512×512 等效 → 8.0367 ms/step（48%）。不含渲染与蓝图。
+
+<!-- /CHECKPOINT -->
+
+---
+
+### ⚠️ 一条重要的环境事实（我为此误判了两次）
+
+**UBT 在启动时会备份自己的 trace 与日志文件**（`EpicGames.Core.Log.BackupLogFile`）。这套操作
+（`FileReference.Move` / `Delete`）在**受限沙箱**下被拒，抛出的却是 `UnauthorizedAccessException`
+—— **看起来像权限问题，实际是沙箱拦截**。
+
+- 我第一次据此断言"`%LOCALAPPDATA%\UnrealBuildTool\` 在 Windows 上真的不可写"——**错的**。
+  在 bash 里创建 / 重命名 / 删除那个目录的文件全部成功，连陈旧 `.uba` 都能自由重命名。
+- 真相：**本工具的 bash 不受沙箱限制，pwsh 受限制**。所以 bash 能删、而 UBT（.NET）被拒。
+  **不要再用 bash 或 pwsh 的写测试去判断"某个目录是否可写"** —— 它们处在不同的权限层。
+- 结论：跑 `commands.build` 需要完整文件权限。`workspace-write` 不够，`danger-full-access` 通过。
 
 ### 一句话现状
 

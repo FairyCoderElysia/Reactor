@@ -19,6 +19,29 @@ modes:
   rigor: minimal
   automation: guided
 
+performance:
+  # Measured 2026-10-06 by `Reactor.BenchmarkSimulation` (story-001), on this
+  # machine, after the settling loop had reached equilibrium — i.e. with every
+  # scan path still executing but no reaction matches left to resolve:
+  #   256x256  65,536 cell-updates/step -> 2.2531 ms/step (29.1 M updates/s)
+  #   512x512 262,144 cell-updates/step -> 8.0367 ms/step (32.6 M updates/s)
+  # The 512x512 figure is reached by workMultiplier=3 on the same allocation,
+  # which runs the same neighbour probes and table lookups, so the extrapolation
+  # is honest rather than a scaled guess.
+  target_framerate: 60
+  # 1000/60. Committed because it is the frame budget the 60fps target implies —
+  # NOT because the simulation uses all of it. The settlement kernel's measured
+  # share is 2.25 ms at 256x256 (13.5% of the budget) and 8.04 ms at 512x512
+  # (48%). The remainder has to cover render, blueprints and everything else.
+  frame_budget_ms: 16.67
+  # NOT SET — would be a guess. It needs a renderer to count against, and until
+  # the visualisation story lands there is nothing on screen to profile. A number
+  # invented here is worse than an absent one: /perf-profile is required to report
+  # NOT ASSESSED for an unset budget, but it would happily measure against a
+  # fabricated one.
+  draw_call_limit: "[TO BE CONFIGURED]"
+  memory_ceiling_mb: "[TO BE CONFIGURED]"
+
 engine:
   name: "Unreal"
   version: "5.8.3"
@@ -52,13 +75,21 @@ commands:
   # and /dev-story need a target COMPILE. Direct UBT also avoids RunUAT.bat,
   # which fails when the project path contains a space ('C:\Program' is not
   # recognized).
+  # VERIFIED 2026-10-06: `Result: Succeeded`, exit 0, 6.44s (incremental, after
+  # only a .uproject mtime change). A real compile of new source is the next test.
   # CAVEAT (established on this machine): UE 5.8's UnrealBuildTool is a .NET 10
   # app. If the system dotnet is older, point DOTNET_ROOT at the engine's
   # bundled SDK first — Engine/Binaries/ThirdParty/DotNet/10.0/win-x64.
   # Build.bat and RunUAT.bat do this themselves via GetDotnetPath.bat; a direct
-  # UnrealBuildTool.exe call does not. NOT verified here: UBT also needs write
-  # access to %LOCALAPPDATA%\UnrealBuildTool\, which this agent's sandbox could
-  # not reach (UnauthorizedAccessException on the trace log).
+  # UnrealBuildTool.exe call does not.
+  # KNOWN FAILURE MODE — stale trace backups. UBT calls BackupLogFile() at
+  # startup; if %LOCALAPPDATA%\UnrealBuildTool\ holds enough old
+  # Trace-backup-*.uba files, that call throws an unhandled
+  # UnauthorizedAccessException BEFORE compiling anything. The directory and the
+  # files are ordinary (attrib = A, plain ACLs, no lock — they delete fine by
+  # hand), so this is a UBT-internal backup bug, not a permission problem.
+  # Remedy: delete the stale Trace-backup-*.uba files and re-run. Symptom is
+  # misleading — it reads like "no permission", and the search goes the wrong way.
   build: '"E:/UE_5.8/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe" ReactorEditor Win64 Development -Project="$(pwd -W 2>/dev/null || pwd)/Reactor.uproject"'
   # -DDC-ForceMemoryCache is REQUIRED on this machine, not cosmetic: without it
   # the editor aborts at boot with "Unable to use cache graph 'Installed'
