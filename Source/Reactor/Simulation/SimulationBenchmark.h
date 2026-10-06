@@ -39,7 +39,15 @@ public:
 		/** Cell updates per second implied by MillisecondsPerStep. */
 		double UpdatesPerSecond = 0.0;
 
-		/** Effective number of 65,536-cell grids' worth of work in one step. */
+		/**
+		 * The frame-rate target this measurement is reported against, read from the
+		 * simulation parameters. Carried in the result so Format() never needs a
+		 * literal — a result printed against a different target than the project
+		 * committed to is worse than no number.
+		 */
+		double TargetFramerate = 0.0;
+
+		/** Effective ratio of this step's work to one baseline 256x256 grid. */
 		double EquivalentGridsPerStep = 0.0;
 	};
 

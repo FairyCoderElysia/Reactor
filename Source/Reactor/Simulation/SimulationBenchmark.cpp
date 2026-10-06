@@ -20,6 +20,7 @@ FSimulationBenchmark::FResult FSimulationBenchmark::Measure(FReactorSimulation& 
 	Result.GridWidth = Grid.GetWidth();
 	Result.GridHeight = Grid.GetHeight();
 	Result.WorkMultiplier = Grid.GetParams().WorkMultiplier;
+	Result.TargetFramerate = Grid.GetParams().TargetFramerate;
 	Result.CellUpdatesPerStep = Grid.GetCellUpdatesPerStep();
 	Result.StepsMeasured = FMath::Max(0, StepsToMeasure);
 
@@ -51,8 +52,14 @@ FSimulationBenchmark::FResult FSimulationBenchmark::Measure(FReactorSimulation& 
 	Result.MillisecondsPerStep = (ElapsedSeconds * 1000.0) / static_cast<double>(Result.StepsMeasured);
 	Result.UpdatesPerSecond = static_cast<double>(Result.CellUpdatesPerStep) * 1000.0 / Result.MillisecondsPerStep;
 
-	const double CellsPerBaselineGrid = 256.0 * 256.0;
-	Result.EquivalentGridsPerStep = static_cast<double>(Result.CellUpdatesPerStep) / CellsPerBaselineGrid;
+	// The baseline is the grid this project actually ships at, not a literal pair
+	// of numbers: the ratio is only meaningful relative to the configured baseline,
+	// and a hardcoded 256x256 would keep reporting "1.00x the baseline" for a
+	// project that had since moved to a different size.
+	const double CellsPerBaselineGrid = static_cast<double>(Result.GridWidth) * static_cast<double>(Result.GridHeight);
+	Result.EquivalentGridsPerStep = (CellsPerBaselineGrid > 0.0)
+		? (static_cast<double>(Result.CellUpdatesPerStep) / CellsPerBaselineGrid)
+		: 0.0;
 
 	return Result;
 }
@@ -64,18 +71,27 @@ FString FSimulationBenchmark::Format(const FResult& Result)
 		return TEXT("Reactor benchmark: no measurement (simulation uninitialised, or zero steps requested).");
 	}
 
-	const double BudgetMilliseconds = 1000.0 / 60.0;
-	const double Headroom = (Result.MillisecondsPerStep > 0.0) ? (BudgetMilliseconds / Result.MillisecondsPerStep) : 0.0;
+	// Read from the parameters, never a literal: a hardcoded 60 here would keep
+	// reporting "headroom in a 16.67 ms frame" long after the project committed to
+	// a different target, which is the failure mode this whole data-driven
+	// arrangement exists to prevent. Zero means no target was configured, and the
+	// ratio is then reported as unavailable rather than invented.
+	const double TargetFramerate = Result.TargetFramerate;
+	const double BudgetMilliseconds = (TargetFramerate > 0.0) ? (1000.0 / TargetFramerate) : 0.0;
+	const double Headroom = (BudgetMilliseconds > 0.0 && Result.MillisecondsPerStep > 0.0)
+		? (BudgetMilliseconds / Result.MillisecondsPerStep)
+		: 0.0;
 
 	return FString::Printf(
-		TEXT("Reactor benchmark: %dx%d @ workMultiplier=%d | %lld cell-updates/step | %.4f ms/step | %.1f M updates/s | %.2fx the 256x256 baseline | %.1fx headroom in a 16.67 ms frame (%d steps measured)"),
+		TEXT("Reactor benchmark: %dx%d @ workMultiplier=%d | %lld cell-updates/step | %.4f ms/step | %.1f M updates/s | %.2fx the configured %.0fHz frame | %.2fx the baseline grid | %d steps measured"),
 		Result.GridWidth,
 		Result.GridHeight,
 		Result.WorkMultiplier,
 		Result.CellUpdatesPerStep,
 		Result.MillisecondsPerStep,
 		Result.UpdatesPerSecond / 1.0e6,
-		Result.EquivalentGridsPerStep,
 		Headroom,
+		TargetFramerate,
+		Result.EquivalentGridsPerStep,
 		Result.StepsMeasured);
 }

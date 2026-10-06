@@ -17,6 +17,50 @@
 <!-- STATUS -->
 Epic: reactor
 Feature:
+Task: story-001 已关闭；下一个 story-002
+<!-- /STATUS -->
+
+<!-- CHECKPOINT -->
+**Updated:** 2026-10-06
+**Branch:** `main`
+**Current task:** /story-done — `story-001-data-driven-kernel-and-grid.md` closed: **COMPLETE WITH NOTES**
+**Next step:** `/dev-story production/epics/reactor/story-002-rule-composition-and-attribution.md`（Ready，不被 ADR 阻塞）
+**Blocked on:** nothing
+**Files in progress:** none
+**Run result:** `commands.build` Succeeded · `commands.test` 2/2 Success (EXIT 0) · `Reactor.ResizeCheck` 128/512/1024 三尺寸实跑 · 256×256 = 2.3787 ms/step（7.01× 一个 60Hz 帧）、512×512 等效 = 7.4621 ms（2.23×）
+**Open questions:** tech debt: none · ADR-0001 仍 Proposed（阻塞 story-003/004）· `.claude/scripts/` 与 `epics/index.md` 不存在 · 三个目录已停止跟踪但仍在 git 历史
+<!-- /CHECKPOINT -->` 之后的叙事 —— 给人看的。任何 hook 都不注入它，可以增长。
+
+  注：模板提到的 `bash .claude/scripts/rotate-session-state.sh` 在本 repo **不存在**
+  （`.claude/scripts/` 整个目录缺失），所以叙事超过 ~200 行时需要**手工**搬去
+  `production/session-logs/`。
+-->
+
+<!-- STATUS -->
+Epic: reactor
+Feature:
+Task: story-001 已关闭；下一个是 story-002（规则组合 + 归因记录 + 规则表）
+<!-- /STATUS -->
+
+<!-- CHECKPOINT -->
+**Updated:** 2026-10-06
+**Branch:** `main`
+**Current task:** /story-done — `production/epics/reactor/story-001-data-driven-kernel-and-grid.md` closed: **COMPLETE WITH NOTES**
+**Next step:** `/dev-story production/epics/reactor/story-002-rule-composition-and-attribution.md`（`Status: Ready`，不被 ADR 阻塞）
+**Blocked on:** nothing
+**Files in progress:** none
+**Run result:** story-001 关闭时的证据 —— `commands.build` Result: Succeeded · `commands.test` 2/2 Success（EXIT 0）· `Reactor.ResizeCheck` 128×128 / 512×512 / 1024×1024 三尺寸实跑 · `Reactor.BenchmarkSimulation` 256×256 = 2.3787 ms/step（7.01× 一个 60Hz 帧）、512×512 等效 = 7.4621 ms/step（2.23×）
+**Open questions:** tech debt logged: none · 框架缺口未修：`.claude/scripts/` 与 `production/epics/index.md` 不存在，`story-status.sh` 因此也没有 · ADR-0001 仍为 Proposed（阻塞 story-003/004）· `.backups/.claude/.codegraph` 已从跟踪移除但仍在 git 历史里
+<!-- /CHECKPOINT -->` 之后的叙事 —— 给人看的。任何 hook 都不注入它，可以增长。
+
+  注：模板提到的 `bash .claude/scripts/rotate-session-state.sh` 在本 repo **不存在**
+  （`.claude/scripts/` 整个目录缺失），所以叙事超过 ~200 行时需要**手工**搬去
+  `production/session-logs/`。
+-->
+
+<!-- STATUS -->
+Epic: reactor
+Feature:
 Task: story-001 实现完成并已编译验证，待 /story-done
 <!-- /STATUS -->
 

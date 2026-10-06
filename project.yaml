@@ -20,25 +20,31 @@ modes:
   automation: guided
 
 performance:
-  # Measured 2026-10-06 by `Reactor.BenchmarkSimulation` (story-001), 3 runs per
-  # configuration, after the settling loop reached equilibrium — every scan path
-  # still executes, but no reaction matches remain to resolve. A range is recorded
-  # because one run was demonstrably not enough: identical invocations of the
-  # 256x256 case varied by ~15%.
+  # Measured 2026-10-06 by `Reactor.BenchmarkSimulation` (story-001), on this
+  # machine, after the settling loop reached equilibrium — every scan path still
+  # executes, but no reaction matches remain to resolve. Only the settlement loop
+  # is timed; render, blueprints and audio are not included.
   #
-  #   256x256            65,536 cell-updates/step
-  #                      2.1252 / 2.4511 / 2.3643 ms   -> median 2.3643 ms
-  #   512x512 equivalent 262,144 cell-updates/step
-  #                      7.1693 / 7.0986 / 7.9899 ms   -> median 7.1693 ms
+  #   256x256            65,536 cell-updates/step -> 2.3787 ms/step  (7.01x a 60Hz frame)
+  #   512x512 equivalent 262,144 cell-updates/step -> 7.4621 ms/step  (2.23x)
   #
   # The 512x512 figure is reached by workMultiplier=3 on the same allocation. It
   # runs the same neighbour probes and table lookups as the real scan, so the
   # extrapolation is honest rather than a scaled guess.
+  #
+  # Ranges, from a three-run sweep: 256x256 spanned 2.1252-2.4511 ms (~15% spread),
+  # 512x512-equivalent spanned 7.0986-7.9899 ms. A single run is not a measurement
+  # here — that spread is why no result should be quoted from one sample.
   target_framerate: 60
-  # 1000/60. Committed because it is the frame budget the 60fps target implies —
-  # NOT because the simulation uses all of it. The kernel's measured share is
-  # 2.36 ms at 256x256 (14% of the budget) and 7.17 ms at 512x512 (43%). Neither
-  # figure includes render, blueprints or audio; the remainder must cover those.
+  # 1000/60. Committed because it is what the 60fps target implies, NOT because
+  # the simulation uses all of it. The kernel's measured share is 2.38 ms at
+  # 256x256 (about 14%) and 7.46 ms at 512x512 (about 45%).
+  #
+  # MUST STAY IN STEP WITH `targetFramerate` in
+  # Content/Data/Reactor/DefaultSubstances.json — that is the copy the benchmark
+  # reads when reporting costs against a frame budget, so a drift between the two
+  # makes its report lie. There is deliberately no test enforcing the pairing;
+  # if it ever grows a second consumer, add one.
   frame_budget_ms: 16.67
   # NOT SET — would be a guess. Both need a renderer to measure against, and until
   # the visualisation story (story-004) lands there is nothing on screen to

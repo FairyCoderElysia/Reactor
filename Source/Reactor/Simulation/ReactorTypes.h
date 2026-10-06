@@ -146,6 +146,22 @@ struct REACTOR_API FSimulationParams
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactor")
 	int32 MaxStepsPerFrame = 8;
 
+	/**
+	 * The frame rate this project commits to, and therefore the budget every
+	 * measurement is reported against.
+	 *
+	 * Here rather than hardcoded in the benchmark tool because the tool's whole
+	 * output is "how much of the frame did this cost" — a literal 60 in that
+	 * arithmetic goes stale the moment the target changes, and reports a healthy
+	 * headroom against a budget nobody committed to. It is also not free of
+	 * consequence: it is the same number as `performance.target_framerate` in
+	 * project.yaml, and a drift between the two makes the report lie.
+	 *
+	 * Kept as a float so a 144Hz or 30fps target needs no code change.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactor")
+	float TargetFramerate = 60.0f;
+
 	/** Multiplier on the reaction probability. 1.0 = reactions always fire when a pair matches. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Reactor")
 	float ReactionRateScale = 1.0f;

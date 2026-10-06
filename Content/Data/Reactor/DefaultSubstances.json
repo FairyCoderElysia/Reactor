@@ -3,7 +3,7 @@
 	"_format": {
 		"substances": "id is required. bIsPrimitive defaults to TRUE when absent — an id that forgot to declare itself must never become a non-terminating recursion branch. color is a placeholder only; real art is out of scope (see design/game-brief.md).",
 		"reactions": "a and b are an ORDERED pair, matched as written. resultA is what the first cell becomes; omit it to destroy that cell. resultB plus produceB=true keeps the second cell; produceB=false (the default) is merge semantics — the pair collapses into one cell.",
-		"params": "All tunables live here so rule iteration costs no recompile. workMultiplier is a MEASUREMENT-ONLY stress knob and must stay 0 in any shipped config; see FSimulationParams."
+		"params": "All tunables live here so rule iteration costs no recompile. targetFramerate must stay in step with performance.target_framerate in project.yaml — it is what every measured cost is reported against. workMultiplier is a MEASUREMENT-ONLY stress knob and must stay 0 in any shipped config; see FSimulationParams."
 	},
 
 	"params": {
@@ -11,6 +11,7 @@
 		"gridHeight": 256,
 		"fixedStepSeconds": 0.0166667,
 		"maxStepsPerFrame": 8,
+		"targetFramerate": 60,
 		"reactionRateScale": 1.0,
 		"workMultiplier": 0
 	},

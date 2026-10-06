@@ -1,12 +1,12 @@
 # Story 001: 数据驱动的结算内核与网格
 
 > **Epic**: Reactor（Build order 第 1 步）
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Estimate**: 3–5 天（`coarse`）
 > **Manifest Version**: N/A (minimal — no control manifest)
-> **Last Updated**: —
+> **Last Updated**: 2026-10-06
 
 ## Context
 
@@ -81,7 +81,16 @@
 
 **Story Type**: Logic
 **Required evidence**:
-- Logic: `tests/unit/settlement/[story-slug]_test.[ext]` — must exist and pass（`/story-done` 只检查它**存在**；通过与否由 `/gate-check` / `/smoke-check` 判定，两者都在更后面）
+- Logic: `Source/Reactor/Tests/ReactorSimulationDeterminismTest.cpp` — must exist and pass
+  （`/story-done` 只检查它**存在**；通过与否由 `/gate-check` / `/smoke-check` 判定，两者都在更后面）
+
+> **路径为什么是 Unreal 的形式而不是 `tests/unit/`。** 框架的通用模板给的是
+> `tests/unit/[system]/[story-slug]_test.[ext]`，但各引擎的测试根不同 ——
+> `/dev-story` SKILL.md 自己写明 Godot 是 `tests/`、Unity 是 `Assets/Tests/`、
+> **Unreal 是 `Source/<Module>/Private/Tests/`**。本项目的测试放在
+> `Source/Reactor/Tests/`（UBT 会自动发现模块内任意位置的 Automation 测试，无需改 `Build.cs`）。
+> 留这段是因为合同把"路径不匹配"列为 Known Fragile Point：`/gate-check` 与
+> `/smoke-check` 会照这个字面路径去找，写错就会得到假的 BLOCKING。
 
 **Status**: [x] Evidence recorded 2026-10-06 — see below
 
@@ -122,3 +131,37 @@
 
 - Depends on: None
 - Unlocks: Story 002（规则组合与归因记录）
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-10-06
+**Criteria**: 10/10 passing — 每一条都由实跑验证，无一条来自"读代码推断"
+（`commands.build` Result: Succeeded · `commands.test` 2/2 Success · `Reactor.ResizeCheck`
+128×128 / 512×512 / 1024×1024 三尺寸实跑 · `Reactor.DumpSimulationState` 观察 · `Reactor.BenchmarkSimulation` 实测）
+**Deviations**: 两条 ADVISORY，均已在关闭前修复 ——
+  1. `SimulationBenchmark.cpp` 曾硬编码 `1000.0 / 60.0` 计算帧预算，改配置后会静默过期。
+     已改为从 `FSimulationParams::TargetFramerate`（数据驱动）读取，benchmark 报告也随之改写为
+     `x.xx the configured 60Hz frame`，并新增 `targetFramerate` 到 `DefaultSubstances.json`。
+  2. `## Test Evidence` 声明的路径（框架模板的 `tests/unit/…`）与实际位置不符 ——
+     已改为真实的 Unreal 路径，并附说明（见该节）。
+**Test Evidence**: Logic：`Source/Reactor/Tests/ReactorSimulationDeterminismTest.cpp`
+（2 tests：`RepeatedRunsMatch` 逐步比对确定性 · `DifferentSeedsDiffer` 负向对照）
+**Code Review**: Skipped — `modes.review_mode` 由 `rigor: minimal` 展开为 `solo`（Phase 5 跳过），
+且 `minimal` 档路径不含 `/code-review`。
+
+### 关闭时的诚实附注
+
+- **确定性测试不在合同要求范围内。** `qa.level: minimal` 下 Logic 故事的测试证据门**被跳过**
+  （`story-done` SKILL.md L50–62、L208–213），本故事本可**不带任何测试**结案。测试是我主动补的，
+  而它**抓出了 2 个真 bug**（`GenerateNewSeed()` 丢弃确定性种子、占用判定用浮点比较）——
+  两个都产生"看起来完全正常"的结果，读代码看不出、性能基准也测不到。
+  记录在此是因为它是一条关于本档位的经验事实：**升 `standard` 时最值得先把
+  `testing.strict.logic: true` 打开。**
+- **证据文档 §7 列明了本故事未覆盖的范围**：无渲染（属 story-004）、跨平台/跨编译器确定性未证明、
+  `commands.run` 仍指向编辑器而非游戏。
+
+### 后续
+
+下一个故事：`story-002-rule-composition-and-attribution.md`（`Status: Ready`，不被 ADR 阻塞）。

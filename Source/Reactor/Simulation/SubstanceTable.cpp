@@ -77,6 +77,7 @@ bool FSubstanceTable::FromJsonString(const FString& InJson, FSubstanceTable& Out
 			Params->TryGetNumberField(TEXT("gridHeight"), OutTable.Data.Params.GridHeight);
 			Params->TryGetNumberField(TEXT("fixedStepSeconds"), OutTable.Data.Params.FixedStepSeconds);
 			Params->TryGetNumberField(TEXT("maxStepsPerFrame"), OutTable.Data.Params.MaxStepsPerFrame);
+			Params->TryGetNumberField(TEXT("targetFramerate"), OutTable.Data.Params.TargetFramerate);
 			Params->TryGetNumberField(TEXT("reactionRateScale"), OutTable.Data.Params.ReactionRateScale);
 			Params->TryGetNumberField(TEXT("workMultiplier"), OutTable.Data.Params.WorkMultiplier);
 		}

@@ -87,10 +87,15 @@ already at equilibrium (the scan runs in full but resolves no matches). **Three 
 configuration**, because a single run proved insufficient: identical invocations of the
 256×256 case varied by ~15%.
 
-| Grid | Cell-updates/step | runs (ms/step) | median | M updates/s | Share of 16.67 ms |
+| Grid | Cell-updates/step | latest run | 3-run range | vs a 60Hz frame | vs baseline grid |
 |---|---|---|---|---|---|
-| 256×256 (`workMultiplier=0`) | 65,536 | 2.1252 / 2.4511 / 2.3643 | **2.3643** | 27.7 | 14% |
-| 512×512 equivalent (`workMultiplier=3`) | 262,144 | 7.1693 / 7.0986 / 7.9899 | **7.1693** | 36.6 | 43% |
+| 256×256 (`workMultiplier=0`) | 65,536 | **2.3787 ms** | 2.1252–2.4511 | 7.01× | 1.00× |
+| 512×512 equivalent (`workMultiplier=3`) | 262,144 | **7.4621 ms** | 7.0986–7.9899 | 2.23× | 4.00× |
+
+The frame ratio is now reported by the tool itself against
+`FSimulationParams::TargetFramerate` (data-driven, from the JSON) rather than a literal
+`1000.0 / 60.0` — see the ADVISORY deviation in the story's `## Completion Notes`. The
+figures above are the latest run at each size; `project.yaml` carries the same two numbers.
 
 The 512×512 figure is reached without allocating a 512×512 buffer, by running three extra
 whole-grid passes that perform the **same neighbour probes and table lookups** as the real
@@ -98,10 +103,17 @@ scan — a cheaper loop would make the extrapolation dishonest. `workMultiplier`
 measurement knob and must stay `0` in any shipped config.
 
 **Interpretation, kept separate from the measurement:** at the design's stated target
-(256×256 · 60fps) the kernel takes 14% of the frame. At 512×512 it takes 43% — inside
-budget, but leaving less room for rendering than the "headroom" framing alone suggests.
-Neither figure includes rendering, blueprints or audio; this measures the settlement loop
-by itself.
+(256×256 · 60fps) the kernel takes roughly 1/7 of the frame. At 512×512 it takes about
+2.23× the frame budget's *inverse* — i.e. it fits in one 16.67 ms frame with about 2.2×
+to spare, but that is no longer generous. Neither figure includes rendering, blueprints or
+audio; this measures the settlement loop by itself.
+
+> Two things this table had to be corrected for, both worth keeping. First, the very first
+> figure recorded for this story (`0.3375 ms/step`) was **invalid** — it was measured while
+> the double-buffer bug had emptied the grid, so it timed a scan over nothing. Second, the
+> 2.2531 / 8.0367 pair that replaced it came from a **single run** each; a three-run sweep
+> showed ~15% spread at 256×256, so a single sample is not a measurement. The numbers above
+> are the latest run, with the range beside them.
 
 > An earlier version of this section recorded `2.2531 ms` / `8.0367 ms`. Those came from a
 > single run each and have been superseded by the three-run medians above. The very first
