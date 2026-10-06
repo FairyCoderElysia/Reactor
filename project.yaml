@@ -20,25 +20,31 @@ modes:
   automation: guided
 
 performance:
-  # Measured 2026-10-06 by `Reactor.BenchmarkSimulation` (story-001), on this
-  # machine, after the settling loop had reached equilibrium — i.e. with every
-  # scan path still executing but no reaction matches left to resolve:
-  #   256x256  65,536 cell-updates/step -> 2.2531 ms/step (29.1 M updates/s)
-  #   512x512 262,144 cell-updates/step -> 8.0367 ms/step (32.6 M updates/s)
-  # The 512x512 figure is reached by workMultiplier=3 on the same allocation,
-  # which runs the same neighbour probes and table lookups, so the extrapolation
-  # is honest rather than a scaled guess.
+  # Measured 2026-10-06 by `Reactor.BenchmarkSimulation` (story-001), 3 runs per
+  # configuration, after the settling loop reached equilibrium — every scan path
+  # still executes, but no reaction matches remain to resolve. A range is recorded
+  # because one run was demonstrably not enough: identical invocations of the
+  # 256x256 case varied by ~15%.
+  #
+  #   256x256            65,536 cell-updates/step
+  #                      2.1252 / 2.4511 / 2.3643 ms   -> median 2.3643 ms
+  #   512x512 equivalent 262,144 cell-updates/step
+  #                      7.1693 / 7.0986 / 7.9899 ms   -> median 7.1693 ms
+  #
+  # The 512x512 figure is reached by workMultiplier=3 on the same allocation. It
+  # runs the same neighbour probes and table lookups as the real scan, so the
+  # extrapolation is honest rather than a scaled guess.
   target_framerate: 60
   # 1000/60. Committed because it is the frame budget the 60fps target implies —
-  # NOT because the simulation uses all of it. The settlement kernel's measured
-  # share is 2.25 ms at 256x256 (13.5% of the budget) and 8.04 ms at 512x512
-  # (48%). The remainder has to cover render, blueprints and everything else.
+  # NOT because the simulation uses all of it. The kernel's measured share is
+  # 2.36 ms at 256x256 (14% of the budget) and 7.17 ms at 512x512 (43%). Neither
+  # figure includes render, blueprints or audio; the remainder must cover those.
   frame_budget_ms: 16.67
-  # NOT SET — would be a guess. It needs a renderer to count against, and until
-  # the visualisation story lands there is nothing on screen to profile. A number
-  # invented here is worse than an absent one: /perf-profile is required to report
-  # NOT ASSESSED for an unset budget, but it would happily measure against a
-  # fabricated one.
+  # NOT SET — would be a guess. Both need a renderer to measure against, and until
+  # the visualisation story (story-004) lands there is nothing on screen to
+  # profile. A fabricated number is worse than an absent one: /perf-profile is
+  # required to report NOT ASSESSED for an unset budget, but would happily measure
+  # against an invented one.
   draw_call_limit: "[TO BE CONFIGURED]"
   memory_ceiling_mb: "[TO BE CONFIGURED]"
 

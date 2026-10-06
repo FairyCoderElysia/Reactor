@@ -87,20 +87,31 @@ void FGridSimulation::FillRandom(int32 Seed, float Density)
 		return;
 	}
 
-	// One seeded stream per cell, advanced by its own index-derived seed. A single
-	// shared stream would make the value at a cell depend on how many cells were
-	// drawn before it, which is precisely the order-dependence the determinism
-	// contract forbids — and it would show up as a row-major gradient in the fill.
+	// One stream for the whole fill, seeded deterministically and drawn in a fixed
+	// index order. Single-threaded and order-fixed means the sequence is
+	// reproducible; a per-cell stream would be more obviously order-independent
+	// but is not needed here, and it invited the bug below.
+	//
+	// DO NOT call GenerateNewSeed() on this stream. Its implementation is
+	// Initialize(FMath::Rand()), and FMath::Rand() draws from the process-global
+	// RNG, which is seeded from platform entropy. Calling it silently replaces the
+	// deterministic seed just set — the fill then differs between two runs of the
+	// same build, which is exactly what the determinism test caught.
+	//
+	// Occupancy is decided with integer arithmetic, not `FRand() < Density`: that
+	// comparison is a floating-point one and FRand()'s low bits are not stable
+	// across runs (FMA contraction, optimisation settings), so a cell sitting on
+	// the threshold flips. Density stays a float in the public API but is quantised
+	// to whole percent here so no float comparison reaches the decision.
+	const int32 DensityPercent = FMath::Clamp(FMath::RoundToInt(Density * 100.0f), 0, 100);
+
+	FRandomStream Stream(Seed);
 	for (int32 Y = 0; Y < Height; ++Y)
 	{
 		for (int32 X = 0; X < Width; ++X)
 		{
-			const int32 Index = IndexOf(X, Y);
-			FRandomStream Stream(Seed + Index * 7919);
-			Stream.GenerateNewSeed();
-
-			const bool bOccupied = Stream.FRand() < Density;
-			CellsPrev[Index] = bOccupied
+			const bool bOccupied = Stream.RandRange(1, 100) <= DensityPercent;
+			CellsPrev[IndexOf(X, Y)] = bOccupied
 				? (*Substances)[Stream.RandRange(0, Substances->Num() - 1)].Id
 				: FSubstanceId();
 		}

@@ -82,38 +82,115 @@ regression.
 
 ## 4. Performance
 
-`Reactor.BenchmarkSimulation` — 30 measured steps after 3 warm-up steps, measured with the
-grid already at equilibrium (so the scan runs in full but resolves no matches):
+`Reactor.BenchmarkSimulation` — 30 measured steps after 3 warm-up steps, with the grid
+already at equilibrium (the scan runs in full but resolves no matches). **Three runs per
+configuration**, because a single run proved insufficient: identical invocations of the
+256×256 case varied by ~15%.
 
-| Grid | Cell-updates/step | ms/step | M updates/s | Share of a 16.67 ms frame |
-|---|---|---|---|---|
-| 256×256 (`workMultiplier=0`) | 65,536 | **2.2531** | 29.1 | 13.5% |
-| 512×512 equivalent (`workMultiplier=3`) | 262,144 | **8.0367** | 32.6 | 48% |
+| Grid | Cell-updates/step | runs (ms/step) | median | M updates/s | Share of 16.67 ms |
+|---|---|---|---|---|---|
+| 256×256 (`workMultiplier=0`) | 65,536 | 2.1252 / 2.4511 / 2.3643 | **2.3643** | 27.7 | 14% |
+| 512×512 equivalent (`workMultiplier=3`) | 262,144 | 7.1693 / 7.0986 / 7.9899 | **7.1693** | 36.6 | 43% |
 
-The 512×512 figure is reached without allocating a 512×512 buffer by running three extra
+The 512×512 figure is reached without allocating a 512×512 buffer, by running three extra
 whole-grid passes that perform the **same neighbour probes and table lookups** as the real
 scan — a cheaper loop would make the extrapolation dishonest. `workMultiplier` is a
 measurement knob and must stay `0` in any shipped config.
 
 **Interpretation, kept separate from the measurement:** at the design's stated target
-(256×256 · 60fps) the kernel is comfortable at 13.5% of the frame. At 512×512 it takes
-48%, which is inside budget but leaves less room for rendering than the headroom number
-alone suggests. Neither figure includes rendering or blueprints — this measures the
-settlement loop only.
+(256×256 · 60fps) the kernel takes 14% of the frame. At 512×512 it takes 43% — inside
+budget, but leaving less room for rendering than the "headroom" framing alone suggests.
+Neither figure includes rendering, blueprints or audio; this measures the settlement loop
+by itself.
 
-## 5. What is NOT verified
+> An earlier version of this section recorded `2.2531 ms` / `8.0367 ms`. Those came from a
+> single run each and have been superseded by the three-run medians above. The very first
+> figure recorded for this story — `0.3375 ms/step` — was **invalid**: it was measured
+> while the double-buffer bug had emptied the grid, i.e. it timed a scan over nothing.
 
-- **Determinism is not mechanically enforced.** The acceptance criterion "same input twice
-  → identical result" was reasoned about (no wall-clock use, no shared PRNG stream,
-  fixed neighbour probe order, `FRandomStream` seeded per cell) but **no test asserts it**,
-  because `qa.level: minimal` waives test files. This is the single most valuable thing a
-  later tier should pick up.
+
+## 5. Determinism — enforced by test since 2026-10-06
+
+The acceptance criterion "same input twice → identical result" was originally **only
+reasoned about, not verified**, because `qa.level: minimal` waives test files. That gap was
+closed the same day, and closing it paid for itself: **the reasoning was wrong in two
+places, and only running the check found them.**
+
+### The test
+
+`Source/Reactor/Tests/ReactorSimulationDeterminismTest.cpp` — two Unreal Automation tests,
+fed from an in-memory JSON fixture rather than `Content/`, so they cannot start failing
+because someone tuned a designer-facing number. Naming follows
+`<Project>.<System>.<Scenario>` for the `Reactor.` filter in `commands.test`.
+
+| Test | What it asserts |
+|---|---|
+| `Reactor.Simulation.Determinism.RepeatedRunsMatch` | Same seed, 24 steps, compared **after every step** — a kernel that diverges and then re-converges would pass a final-only check |
+| `Reactor.Simulation.Determinism.DifferentSeedsDiffer` | Two seeds must produce **different** initial grids — without this, a kernel that ignored the seed entirely (or returned a constant grid) would pass the test above |
+
+Command:
+
+```
+UnrealEditor-Cmd.exe <abs>/Reactor.uproject -ExecCmds="Automation RunTests Reactor.; Quit" \
+  -unattended -nullrhi -stdout -FullStdOutLogOutput -DDC-ForceMemoryCache
+```
+
+**Result: 2 tests found, 2 Success, `**** TEST COMPLETE. EXIT CODE: 0 ****`.**
+This also exercises `commands.test` end to end for the first time.
+
+### Bug 3 — `GenerateNewSeed()` silently discards a deterministic seed
+
+```cpp
+FRandomStream Stream(Seed + Index * 7919);   // seed set...
+Stream.GenerateNewSeed();                    // ...then thrown away
+```
+
+`GenerateNewSeed()` is implemented as `Initialize(FMath::Rand())`, and `FMath::Rand()`
+draws from the **process-global** RNG, seeded from platform entropy. Calling it after
+setting a seed replaces that seed with a non-reproducible one.
+
+Reported symptom: `Step 1: first divergence at index 0 ('Lava' vs 'None')`.
+
+Fix: one stream for the whole fill, seeded once, drawn in fixed index order, no
+`GenerateNewSeed()`. Single-threaded and order-fixed is reproducible; the per-cell stream
+was more elaborate and bought nothing.
+
+### Bug 4 — a floating-point comparison in the seed path
+
+`const bool bOccupied = Stream.FRand() < Density;` is a **float** comparison. `FRand()`'s
+low bits are not stable across runs (FMA contraction, optimisation settings), so a cell
+sitting on the threshold flips — which changes how many draws the stream consumes
+afterwards and re-rolls the substance for every later cell.
+
+Fix: decide occupancy with integer arithmetic (`RandRange(1, 100) <= DensityPercent`).
+`Density` stays a `float` in the public API but is quantised to whole percent before it
+reaches any decision.
+
+Reported symptom (surfaced after bug 3 was fixed): `Step 1: first divergence at index 1
+('Steam' vs 'Lava')`.
+
+> **Both bugs were in the *seeding* path, not the step path**, and both produced a
+> plausible non-error: the simulation ran, reached equilibrium, and reported sensible
+> occupancy numbers. Neither is visible by reading the code with the intent of finding a
+> bug, and neither would have shown up in the performance benchmark — which is why
+> revisiting the waived-test decision was worth doing rather than accepting it.
+
+### Limits of what this proves
+
+The test proves determinism **within one process and one build**. It does not prove
+cross-platform or cross-compiler reproducibility, and it does not pin the fill to a golden
+grid. Both would be needed before a shared puzzle file could be trusted across machines —
+noted here rather than claimed.
+
+## 6. What is NOT verified
+
 - **No rendering.** Nothing was drawn; that is story-004.
+- **Grid resize was not exercised at runtime.** The dimensions come from JSON rather than
+  being compiled in, and `Initialize` honours them, but only 256×256 has actually been built.
 - **`commands.run` still opens the editor, not the game** — unchanged by this story.
-- **Grid resize was not exercised at runtime.** The dimensions are read from JSON rather
-  than compiled in, and `Initialize` uses them, but only 256×256 was actually built.
+- **Cross-platform determinism** — see the limits note above.
 
-## 6. Reproducing
+## 7. Reproducing
 
 ```bash
 # Build (needs DOTNET_ROOT pointed at the engine's bundled .NET 10)

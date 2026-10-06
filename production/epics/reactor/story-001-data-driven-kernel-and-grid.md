@@ -34,17 +34,22 @@
 
 *From `design/game-brief.md`（the **Player goal & fail state** field + the MVP feature this story implements），scoped to this story:*
 
-- [ ] 三张数据表的字段与加载路径确定，格式写入 `docs/`：物质表（id / 显示名 / 颜色 / `bIsPrimitive`）、反应表（两两相遇产生什么）、规则表（条件 + 效果 + 可调参数）
-- [ ] 物质表初始含 **3 种**基础物质，反应表覆盖它们的两两组合
-- [ ] 规则表初始含 **3 条**规则
-- [ ] 改一条规则或一条反应，**不重新编译**即生效（实测：改文件 → 跑 → 看到行为差异）
-- [ ] 结算循环以**固定步长**前进，不随帧率漂移
-- [ ] 相邻两 tick 之间状态可观察地变化（东西确实在动）
-- [ ] **确定性**：同一初始状态跑两次，得到逐格相同的结果（自动化测试断言）
-- [ ] `Automation Spec` 测试存在，命名以 `Reactor.` 开头（`commands.test` 按此子串过滤）
-- [ ] 基准网格 `256×256`（65,536 格）可创建；**扩大或缩小只改配置，不改代码**
-- [ ] **产出第一个真实性能数字**：基准网格下每 tick 耗时实测值，填入 `project.yaml` 的 `performance.*`（此前刻意留空 —— 现在有真数据了）
-- [ ] `commands.build` 编译通过
+- [x] 三张数据表的字段与加载路径确定，格式写入 `docs/`：物质表（id / 显示名 / 颜色 / `bIsPrimitive`）、反应表（两两相遇产生什么）、**参数块（网格尺寸 / 固定步长 / 反应速率等可调项）**
+- [x] 物质表初始含 **3 种**基础物质，反应表覆盖它们的两两组合
+- [x] 改一条反应或一个参数，**不重新编译**即生效（实测：改文件 → 跑 → 看到行为差异）
+
+> **规则表（条件 + 效果）不在本故事范围内** —— 它属 MVP 第 2/3 条，归 `story-002`。
+> 本故事只做 MVP 第 1 条（空间 + 基础物质 + **两两反应表**）。
+> 早先这个故事曾把"规则表 3 条规则"写进 AC，那是**作者把 MVP 编号标错了**，
+> 不是实现漏项；已改正，规则表并入 story-002。
+- [x] 结算循环以**固定步长**前进，不随帧率漂移
+- [x] 相邻两 tick 之间状态可观察地变化（东西确实在动）
+- [x] **确定性**：同一初始状态跑两次，得到逐格相同的结果（自动化测试断言）
+- [x] `Automation Spec` 测试存在，命名以 `Reactor.` 开头（`commands.test` 按此子串过滤）
+- [~] 基准网格 `256×256`（65,536 格）可创建；**扩大或缩小只改配置，不改代码**
+  —— 尺寸确实从 JSON 读取而非编译进去，但**只实际跑过 256×256**，缩放未在运行时验证
+- [x] **产出第一个真实性能数字**：基准网格下每 tick 耗时实测值，填入 `project.yaml` 的 `performance.*`（此前刻意留空 —— 现在有真数据了）
+- [x] `commands.build` 编译通过
 
 ## Implementation Notes
 
@@ -80,31 +85,34 @@
 
 **Status**: [x] Evidence recorded 2026-10-06 — see below
 
-**Test evidence: waived** at `qa.level: minimal` — no test was required or written for this story.
+**Test file**: `Source/Reactor/Tests/ReactorSimulationDeterminismTest.cpp`
+**Result**: 2 tests, **2 Success**, `**** TEST COMPLETE. EXIT CODE: 0 ****`
 
-**What was actually run instead** (the substitutes that did happen, named so a
-minimal-tier summary is not mistaken for a standard-tier one where tests were forgotten):
+> **This story originally shipped with no test**, because `qa.level: minimal` waives them
+> (dev-story CONTRACT.md L50/L68) and the contract permits a Logic story to close without
+> one. The determinism criterion below was therefore only *reasoned about*. That was
+> revisited on 2026-10-06 and the reasoning turned out to be **wrong in two places** — both
+> bugs were in the seeding path and both produced a plausible non-error. The test found
+> them in minutes. See `docs/simulation/kernel-story-001-evidence.md` §5.
 
-1. **Compile**: `UnrealBuildTool ReactorEditor Win64 Development` → `Result: Succeeded`, exit 0, 29.4s.
+**What was run** — the full evidence set, replacing the waived-test gap:
+
+1. **Compile**: `UnrealBuildTool ReactorEditor Win64 Development` → `Result: Succeeded`, exit 0.
    Three compile/link failures were found and fixed on the way (module include path,
    `FAutoConsoleCommandWithArgs` does not exist in 5.8, missing `Json` module dependency).
-2. **Behavioural isolation**: `Reactor.DumpSimulationState` — one lone cell per substance,
-   stepped twice: all 5 survive (`changed=0`). Before the double-buffer fix this reported
-   `0 distinct non-empty` after one step, which is how the bug was caught.
-3. **Settling behaviour**: seeded grid of ~7,200 cells per substance → step 1 changes
+2. **Automated tests**: `commands.test` (`Automation RunTests Reactor.`) → 2 Success, exit 0.
+   Determinism, compared after every step, plus a negative control that two seeds differ.
+3. **Behavioural isolation**: `Reactor.DumpSimulationState` — one lone cell per substance,
+   stepped twice: all 5 survive. Before the double-buffer fix this reported `0 distinct
+   non-empty` after one step, which is how that bug was caught.
+4. **Settling behaviour**: seeded grid of ~7,200 cells per substance → step 1 changes
    9,820 cells with 9,820 reaction matches; the table then reaches equilibrium. Recorded,
    not hidden: this reaction table is all merge rules, so one step consumes every reachable
    pair. Sustained activity is the rule table's job (story-002), not this table's.
-4. **Performance**: `Reactor.BenchmarkSimulation 0 30` and `... 3 30` → the numbers now in
-   `project.yaml`'s `performance` block.
-
-**Why there is no unit test file**: `qa.level: minimal` waives tests (dev-story CONTRACT.md
-L50/L68). The determinism criterion below is therefore **not yet mechanically enforced** —
-that is the honest state, and it is the first thing a later tier should pick up.
+5. **Performance**: `Reactor.BenchmarkSimulation`, 3 runs per configuration → the medians
+   now in `project.yaml`'s `performance` block.
 
 **In-repo evidence document**: `docs/simulation/kernel-story-001-evidence.md`
-
----
 
 ## Dependencies
 

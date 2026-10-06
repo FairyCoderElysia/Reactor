@@ -160,6 +160,57 @@ force-based functionality.
 **Project relevance:** none directly — Reactor has no characters. Recorded because the
 claim is large and easy to misapply.
 
+### `FRandomStream::GenerateNewSeed()` discards a deterministic seed
+
+Not a 5.8 change — a long-standing API trap that costs real debugging time, recorded
+because the failure is a *plausible non-error* rather than a crash.
+
+`GenerateNewSeed()` is implemented as `Initialize(FMath::Rand())`. `FMath::Rand()` draws
+from the **process-global** RNG, seeded from platform entropy. So this:
+
+```cpp
+FRandomStream Stream(Seed);   // deterministic seed set...
+Stream.GenerateNewSeed();     // ...silently replaced
+```
+
+throws away the seed just set. Two runs of the same build then produce different results,
+with no error and no warning.
+
+**Symptom shape:** a "seeded" fill that differs between runs, with the first divergence
+appearing in the *initial* state — before any simulation step has run. That detail is the
+clue: if the divergence were in the step, the seed would be fine and the kernel would not.
+
+**Also do not decide anything with `FRand()` in code that must be reproducible.**
+`const bool b = Stream.FRand() < Threshold;` is a float comparison, and `FRand()`'s low bits
+are not stable across runs (FMA contraction, optimisation settings). A value sitting on the
+threshold flips, which changes how many draws the stream consumes afterwards and re-rolls
+every later draw. Prefer the integer forms: `RandRange(1, 100) <= Percent`, `RandRange(A, B)`,
+`RandBool()`.
+
+Both were found in one session by an Unreal Automation test that ran the same seed twice and
+compared after every step — see `docs/simulation/kernel-story-001-evidence.md` §5. Neither is
+visible by reading the code with the intent of finding a bug.
+
+### Automation test flags are unscoped in 5.8
+
+`EAutomationTestFlags::ApplicationContextMask` **does not compile** in 5.8 — the context mask
+is the unscoped enumerator `EAutomationTestFlags_ApplicationContextMask`:
+
+```cpp
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FMyTest, "Project.System.Scenario",
+    EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+```
+
+The per-filter flags (`ProductFilter`, `EngineFilter`, `SmokeFilter`, `ClientContext`, …) are
+still scoped under `EAutomationTestFlags::`. Grep the engine's own tests under
+`Engine/Source/Runtime/Core/Private/` for the current spelling rather than recalling it.
+
+Tests are discovered from anywhere in a module; `Source/<Module>/Tests/` works without any
+additional `Build.cs` change. Name them `<Project>.<System>.<Scenario>` — a `RunTests` filter
+is a **substring** match, so a project named after an engine area will drag in thousands of
+engine tests if the root is not distinct.
+
 ### How to read version spans in the release notes
 
 The 5.8 release notes' Upgrade Notes section contains items for **many** versions, not

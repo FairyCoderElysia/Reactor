@@ -24,11 +24,11 @@ Task: story-001 实现完成并已编译验证，待 /story-done
 **Updated:** 2026-10-06
 **Branch:** `main`
 **Current task:** `/dev-story` on `production/epics/reactor/story-001-data-driven-kernel-and-grid.md` — 实现完成、编译通过、行为已实测
-**Next step:** `/story-done production/epics/reactor/story-001-data-driven-kernel-and-grid.md`（`minimal` 档无需 `/code-review`）
+**Files in progress:** 见下 · **Next step:** `/story-done production/epics/reactor/story-001-data-driven-kernel-and-grid.md`（`minimal` 档无需 `/code-review`）
 **Blocked on:** nothing
 **Files in progress:** `Source/Reactor/Simulation/{ReactorTypes.h,SubstanceTable.h,SubstanceTable.cpp,GridSimulation.h,GridSimulation.cpp,ReactorSimulation.h,ReactorSimulation.cpp,SimulationBenchmark.h,SimulationBenchmark.cpp}` · `Source/Reactor/Reactor.cpp` · `Source/Reactor/Reactor.Build.cs` · `Content/Data/Reactor/DefaultSubstances.json` · `project.yaml` · `production/epics/reactor/story-001-*.md` · `docs/simulation/kernel-story-001-evidence.md`
-**Run result:** `OBSERVED` — headless run, no rendering: `Reactor.DumpSimulationState` prints 5 substances / 6 reactions / 256×256; a seeded 55% grid of ~36,000 cells settles in one step (9,820 changed, 9,820 reacted) to ~31,851 cells and then holds steady. Isolation check: 5 lone cells survive 2 steps unchanged. `Reactor.BenchmarkSimulation` → 2.2531 ms/step @ 256×256, 8.0367 ms/step @ 512×512-equivalent. **`commands.run` still opens the editor, not the game — that is story-004's job, so there is no on-screen evidence for this story and none is expected.**
-**Open questions:** 反应表全部是 merge 规则 → 一步即达平衡（**预期的**，持续涌现要靠 story-002 的规则表）· **确定性没有被任何测试断言**（`qa.level: minimal` 豁免测试），这是升档后最该补的一条 · `commands.build` 需要完整文件权限（UBT 的 .NET 文件操作写 `%LOCALAPPDATA%\UnrealBuildTool\`）· 别再用 bash/pwsh 的写测试判断目录可写性（两者权限层不同）
+**Run result:** 2 个自动化测试全部 Success（`EXIT CODE: 0`，`commands.test` 首次真正跑通）· `OBSERVED` — headless run, no rendering: `Reactor.DumpSimulationState` prints 5 substances / 6 reactions / 256×256; a seeded 55% grid of ~36,000 cells settles in one step (9,820 changed, 9,820 reacted) to ~31,851 cells and then holds steady. Isolation check: 5 lone cells survive 2 steps unchanged. `Reactor.BenchmarkSimulation` → 2.3643 ms/step @ 256×256, 7.1693 ms/step @ 512×512-equivalent（3 轮中位数）. **`commands.run` still opens the editor, not the game — that is story-004's job, so there is no on-screen evidence for this story and none is expected.**
+**Open questions:** 确定性测试证明的是**单进程单构建内**的确定性，跨平台/跨编译器未证明 · 反应表全部是 merge 规则 → 一步即达平衡（**预期的**，持续涌现要靠 story-002 的规则表）· **确定性没有被任何测试断言**（`qa.level: minimal` 豁免测试），这是升档后最该补的一条 · `commands.build` 需要完整文件权限（UBT 的 .NET 文件操作写 `%LOCALAPPDATA%\UnrealBuildTool\`）· 别再用 bash/pwsh 的写测试判断目录可写性（两者权限层不同）
 <!-- /CHECKPOINT -->
 
 ---
@@ -49,11 +49,22 @@ Task: story-001 实现完成并已编译验证，待 /story-done
 
 - **双缓冲写反了**：`StepPass` 把写缓冲**清空**而不是从读缓冲拷贝 → 没有任何写操作的格子在新帧里变空 →
   **一步清空整张网格**。靠"每物质放一个孤立格子、步进一次"隔离出来。
-- **这个 bug 让第一次性能测量无效**：那份 `0.3375 ms/step` 是在**空网格**上测的。修正后是 2.2531 ms（256×256），
+- **这个 bug 让第一次性能测量无效**：那份 `0.3375 ms/step` 是在**空网格**上测的。修正后是 ~2.36 ms（256×256，3 轮中位数），
   慢了约 6.7 倍。**那个错数字看起来很合理，差点就被信了。**
 
-**性能（实测，已填入 `project.yaml`）**：256×256 → 2.2531 ms/step（占 16.67ms 预算 13.5%）；
-512×512 等效 → 8.0367 ms/step（48%）。不含渲染与蓝图。
+**确定性测试又抓出 2 个 seeding 路径的非确定性 bug**（两个都产生"看起来正常"的结果，读代码都看不出来）：
+
+- **`GenerateNewSeed()` 会丢弃确定性种子** —— 它的实现是 `Initialize(FMath::Rand())`，
+  而 `FMath::Rand()` 取进程级全局 RNG（平台熵播种）。我 `FRandomStream Stream(Seed)` 之后
+  紧跟一句 `Stream.GenerateNewSeed()`，等于把刚设的种子扔了。
+- **占用判定用了浮点比较**（`Stream.FRand() < Density`）—— `FRand()` 低位跨运行不稳定
+  （FMA / 优化），阈值上的格子会翻转，进而改变后续抽样序列。改成整数（`RandRange(1,100) <= Percent`）。
+
+两个都只出现在**初始网格**上（第一条报的是 `Step 1: first divergence at index 0 ('Lava' vs 'None')`），
+这正是"种子路径有问题、而非结算路径"的线索。详见 `docs/simulation/kernel-story-001-evidence.md` §5。
+
+**性能（实测 3 轮取中位数，已填入 `project.yaml`）**：256×256 → 2.3643 ms/step（占 16.67ms 预算 14%，三轮 2.1252–2.4511）；
+512×512 等效 → 7.1693 ms/step（43%，三轮 7.0986–7.9899）。不含渲染与蓝图。
 
 <!-- /CHECKPOINT -->
 
