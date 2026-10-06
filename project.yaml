@@ -1,0 +1,70 @@
+# CCGS project configuration — single source of truth for project settings.
+# Schema: grep the `## <key>` section of .claude/docs/effects-map.md —
+# it is ~31k tokens whole, ~900 per section. Do not open it entire.
+
+schema_version: 1
+
+framework:
+  version: 1.1.2
+  last_upgraded: 2026-10-05
+
+project:
+  stage: Concept
+# modes.rigor fronts six knobs (modes.workflow, docs.density, qa.level,
+# modes.story_granularity, modes.review_mode, team.size). Do NOT write those six
+# here — an explicit value pins it and shadows the rigor expansion. Project-wide
+# exceptions go in the top-level workflow_overrides block; per-system ones in
+# workflow_overrides.system_overrides.
+modes:
+  rigor: minimal
+  automation: guided
+
+engine:
+  name: "Unreal"
+  version: "5.8.3"
+  language: "C++"
+  rendering: "Lumen + Nanite (deferred)"
+  physics: "Chaos"
+  # The editor is not on PATH. Agents and /smoke-check read this to find the
+  # engine; it is NOT spliced into commands.* at run time (those carry the full
+  # path themselves).
+  path: "E:/UE_5.8"
+
+specialists:
+  code: "unreal-specialist"
+  shader: "unreal-specialist"
+  ui: "ue-umg-specialist"
+  additional: ["ue-gas-specialist", "ue-blueprint-specialist", "ue-replication-specialist"]
+
+naming:
+  classes: PascalCase
+  variables: PascalCase
+  constants: SCREAMING_SNAKE   # UNVERIFIED — not sourceable from
+                               # docs/engine-reference/unreal/; confirm before relying on it
+  signals: PascalCase_OnEvent
+  files: PascalCase
+  scenes: PascalCase
+
+commands:
+  # TODO: confirm these for your UE version and project — adjust via /settings
+  # `build` invokes UnrealBuildTool directly rather than AutomationTool
+  # BuildCookRun: BuildCookRun packages (pack + cook), while the upgrade audit
+  # and /dev-story need a target COMPILE. Direct UBT also avoids RunUAT.bat,
+  # which fails when the project path contains a space ('C:\Program' is not
+  # recognized).
+  # CAVEAT (established on this machine): UE 5.8's UnrealBuildTool is a .NET 10
+  # app. If the system dotnet is older, point DOTNET_ROOT at the engine's
+  # bundled SDK first — Engine/Binaries/ThirdParty/DotNet/10.0/win-x64.
+  # Build.bat and RunUAT.bat do this themselves via GetDotnetPath.bat; a direct
+  # UnrealBuildTool.exe call does not. NOT verified here: UBT also needs write
+  # access to %LOCALAPPDATA%\UnrealBuildTool\, which this agent's sandbox could
+  # not reach (UnauthorizedAccessException on the trace log).
+  build: '"E:/UE_5.8/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe" ReactorEditor Win64 Development -Project="$(pwd -W 2>/dev/null || pwd)/Reactor.uproject"'
+  # -DDC-ForceMemoryCache is REQUIRED on this machine, not cosmetic: without it
+  # the editor aborts at boot with "Unable to use cache graph 'Installed'
+  # because it has no writable nodes available" (observed exit 3; exit 0 with
+  # the flag). Applies to any headless UnrealEditor-Cmd invocation.
+  test: '"E:/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "$(pwd -W 2>/dev/null || pwd)/Reactor.uproject" -ExecCmds="Automation RunTests Reactor.; Quit" -unattended -nullrhi -stdout -FullStdOutLogOutput -DDC-ForceMemoryCache'
+  run: '"E:/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe" "$(pwd -W 2>/dev/null || pwd)/Reactor.uproject" -game -windowed -ResX=1280 -ResY=720'
+  # Verified 2026-10-06: exits 0, clean boot and shutdown.
+  smoke: '"E:/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "$(pwd -W 2>/dev/null || pwd)/Reactor.uproject" -game -nullrhi -unattended -stdout -DDC-ForceMemoryCache -ExecCmds="Quit"'

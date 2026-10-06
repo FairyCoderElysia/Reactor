@@ -1,0 +1,42 @@
+# 行尾规范化 —— 防止同一文件在 Windows/macOS/Linux 之间产生整文件 diff
+#
+# 为什么需要：本仓库 259 个文件里 224 个是 markdown。若行尾不统一，
+# 换一台机器克隆后每个文件都会显示"全文已修改"，真正的改动会被淹没。
+#
+# 规则：文本一律以 LF 存入仓库；只对批处理文件例外（.bat/.cmd 必须是 CRLF，
+# 否则 Windows cmd.exe 会解析出错）。
+
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# ── 二进制类型（永不当作文本处理，防止被自动转换损坏）────────────────────────
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tga binary
+*.dds binary
+*.exr binary
+*.hdr binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.fbx binary
+*.ttf binary
+*.otf binary
+*.zip binary
+
+# ── UE 资产（一旦 Content/ 开始放东西，这些必须按二进制处理）──────────────────
+# 注：UE 5 的 .uasset/.umap 带独占锁，LFS 会更合适；当前 Content/ 为空，
+# 等真正开始放资产时再评估是否引入 Git LFS。
+*.uasset binary
+*.umap binary
+*.upk binary
+
+# ── 语言统计：把这些标成"非代码"，避免污染 GitHub 语言占比 ─────────────────
+*.md linguist-documentation
+.claude/** linguist-vendored
+docs/engine-reference/** linguist-vendored

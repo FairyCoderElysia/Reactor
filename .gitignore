@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reactor — Unreal Engine 5.8 .gitignore
+#
+# 目的：只备份【不可再生的东西】—— 源码、配置、设计文档、工程描述。
+# 引擎能重新生成的一律忽略。
+#
+# 判断标准：删掉它以后，能不能靠工程本身重新造出来？
+#   能  → 忽略（Intermediate/ 2.7G、Binaries/ 60M 属于此类）
+#   不能 → 提交（Source/、Config/、design/、docs/、*.uproject）
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── UE 构建产物（可重新生成；当前 Intermediate/ 已 2.7G）──────────────────────
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# ── 生成的 IDE 工程文件（右键 .uproject → Generate Visual Studio project files）─
+# 真正需要版本控制的是 Reactor.uproject 和 Source/，不是这些生成物。
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.slnx
+
+# ── IDE / 工具缓存 ───────────────────────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.user
+*.userprefs
+*.opendb
+
+# ── 构建/编译 ────────────────────────────────────────────────────────────────
+*.pdb
+*.target
+*.modules
+*.obj
+*.o
+*.dll
+*.exe
+*.lib
+*.exp
+*.ilk
+
+# ── 崩溃与日志（可能含机器路径、内存残片）──────────────────────────────────
+Crashes/
+Logs/
+*.log
+
+# ── 系统垃圾 ─────────────────────────────────────────────────────────────────
+Thumbs.db
+Desktop.ini
+desktop.ini
+.DS_Store
+*~
+*.tmp
+*.swp
+
+# ── 编辑器个人设置 ───────────────────────────────────────────────────────────
+# EditorPerProjectUserSettings.ini 含本机绝对路径，且属于个人偏好而非工程设定
+Saved/
+EditorPerProjectUserSettings.ini
+
+# ── 刻意【不】忽略的东西（写在这里以免以后有人误加）────────────────────────
+# !Reactor.uproject        ← 工程描述，必须提交
+# !Config/                ← DefaultEngine.ini / DefaultGame.ini / DefaultInput.ini 是工程设定
+# !Source/                ← 游戏源码，本仓库的核心
+# !Content/               ← 游戏资产（当前为空；一旦有资产就是不可再生数据）
+# !design/ !docs/ !production/   ← 设计文档与决策记录
+# !.claude/               ← CCGS 框架配置（仅 1.9M 纯文本：agents/rules/hooks/docs）
+# !project.yaml !CLAUDE.md       ← 配置与本项目上下文
+# !.backups/              ← 设计文档改版前的快照（仅 20K，丢了就没了）
+# !.vsconfig              ← VS 工作负载描述，不含机器专有信息
