@@ -3,15 +3,15 @@
 <!--
   本合同的两个区域不可互换（见 .claude/docs/templates/session-state.md）：
 
-    1. CHECKPOINT 区（STATUS + CHECKPOINT 两个块）——**机器读的区域**。
-       session-start.sh 原样注入上下文，因此**构造上有界：保持在 ~25 行以内**。
-       每次更新是**整体覆盖**，不是追加。
+    1. STATUS + CHECKPOINT 两个块 —— 机器读的区域。session-start.sh 原样注入上下文，
+       因此构造上有界：保持在 ~25 行以内。每次更新是整体覆盖，不是追加。
 
-    2. `<!-- /CHECKPOINT -->` 之后的叙事 —— 给人看的。任何 hook 都不注入它，可以增长。
+    2. 结束标记之后的叙事 —— 给人看的。任何 hook 都不注入它，可以增长。
 
-  注：模板提到的 `bash .claude/scripts/rotate-session-state.sh` 在本 repo **不存在**
-  （`.claude/scripts/` 整个目录缺失），所以叙事超过 ~200 行时需要**手工**搬去
-  `production/session-logs/`。
+  维护警告：不要用脚本按标记字符串定位这个文件来做替换。头部与笔记里【引用】了
+  那些标记作为文字说明，一个朴素的 string.replace / 区间搜索会命中引用而不是真标记
+  —— 2026-10-06 就是这样把本文件写出三个重复块、并把标记文字撕成
+  "结束标记 + 反引号之后的叙事…" 的。要改就整块重写。
 -->
 
 <!-- STATUS -->
@@ -29,53 +29,7 @@ Task: story-001 已关闭；下一个 story-002
 **Files in progress:** none
 **Run result:** `commands.build` Succeeded · `commands.test` 2/2 Success (EXIT 0) · `Reactor.ResizeCheck` 128/512/1024 三尺寸实跑 · 256×256 = 2.3787 ms/step（7.01× 一个 60Hz 帧）、512×512 等效 = 7.4621 ms（2.23×）
 **Open questions:** tech debt: none · ADR-0001 仍 Proposed（阻塞 story-003/004）· `.claude/scripts/` 与 `epics/index.md` 不存在 · 三个目录已停止跟踪但仍在 git 历史
-<!-- /CHECKPOINT -->` 之后的叙事 —— 给人看的。任何 hook 都不注入它，可以增长。
-
-  注：模板提到的 `bash .claude/scripts/rotate-session-state.sh` 在本 repo **不存在**
-  （`.claude/scripts/` 整个目录缺失），所以叙事超过 ~200 行时需要**手工**搬去
-  `production/session-logs/`。
--->
-
-<!-- STATUS -->
-Epic: reactor
-Feature:
-Task: story-001 已关闭；下一个是 story-002（规则组合 + 归因记录 + 规则表）
-<!-- /STATUS -->
-
-<!-- CHECKPOINT -->
-**Updated:** 2026-10-06
-**Branch:** `main`
-**Current task:** /story-done — `production/epics/reactor/story-001-data-driven-kernel-and-grid.md` closed: **COMPLETE WITH NOTES**
-**Next step:** `/dev-story production/epics/reactor/story-002-rule-composition-and-attribution.md`（`Status: Ready`，不被 ADR 阻塞）
-**Blocked on:** nothing
-**Files in progress:** none
-**Run result:** story-001 关闭时的证据 —— `commands.build` Result: Succeeded · `commands.test` 2/2 Success（EXIT 0）· `Reactor.ResizeCheck` 128×128 / 512×512 / 1024×1024 三尺寸实跑 · `Reactor.BenchmarkSimulation` 256×256 = 2.3787 ms/step（7.01× 一个 60Hz 帧）、512×512 等效 = 7.4621 ms/step（2.23×）
-**Open questions:** tech debt logged: none · 框架缺口未修：`.claude/scripts/` 与 `production/epics/index.md` 不存在，`story-status.sh` 因此也没有 · ADR-0001 仍为 Proposed（阻塞 story-003/004）· `.backups/.claude/.codegraph` 已从跟踪移除但仍在 git 历史里
-<!-- /CHECKPOINT -->` 之后的叙事 —— 给人看的。任何 hook 都不注入它，可以增长。
-
-  注：模板提到的 `bash .claude/scripts/rotate-session-state.sh` 在本 repo **不存在**
-  （`.claude/scripts/` 整个目录缺失），所以叙事超过 ~200 行时需要**手工**搬去
-  `production/session-logs/`。
--->
-
-<!-- STATUS -->
-Epic: reactor
-Feature:
-Task: story-001 实现完成并已编译验证，待 /story-done
-<!-- /STATUS -->
-
-<!-- CHECKPOINT -->
-**Updated:** 2026-10-06
-**Branch:** `main`
-**Current task:** `/dev-story` on `production/epics/reactor/story-001-data-driven-kernel-and-grid.md` — 实现完成、编译通过、行为已实测
-**Files in progress:** 见下 · **Next step:** `/story-done production/epics/reactor/story-001-data-driven-kernel-and-grid.md`（`minimal` 档无需 `/code-review`）
-**Blocked on:** nothing
-**Files in progress:** `Source/Reactor/Simulation/{ReactorTypes.h,SubstanceTable.h,SubstanceTable.cpp,GridSimulation.h,GridSimulation.cpp,ReactorSimulation.h,ReactorSimulation.cpp,SimulationBenchmark.h,SimulationBenchmark.cpp}` · `Source/Reactor/Reactor.cpp` · `Source/Reactor/Reactor.Build.cs` · `Content/Data/Reactor/DefaultSubstances.json` · `project.yaml` · `production/epics/reactor/story-001-*.md` · `docs/simulation/kernel-story-001-evidence.md`
-**Run result:** 2 个自动化测试全部 Success（`EXIT CODE: 0`，`commands.test` 首次真正跑通）· `OBSERVED` — headless run, no rendering: `Reactor.DumpSimulationState` prints 5 substances / 6 reactions / 256×256; a seeded 55% grid of ~36,000 cells settles in one step (9,820 changed, 9,820 reacted) to ~31,851 cells and then holds steady. Isolation check: 5 lone cells survive 2 steps unchanged. `Reactor.BenchmarkSimulation` → 2.3643 ms/step @ 256×256, 7.1693 ms/step @ 512×512-equivalent（3 轮中位数）. **`commands.run` still opens the editor, not the game — that is story-004's job, so there is no on-screen evidence for this story and none is expected.**
-**Open questions:** 确定性测试证明的是**单进程单构建内**的确定性，跨平台/跨编译器未证明 · 反应表全部是 merge 规则 → 一步即达平衡（**预期的**，持续涌现要靠 story-002 的规则表）· **确定性没有被任何测试断言**（`qa.level: minimal` 豁免测试），这是升档后最该补的一条 · `commands.build` 需要完整文件权限（UBT 的 .NET 文件操作写 `%LOCALAPPDATA%\UnrealBuildTool\`）· 别再用 bash/pwsh 的写测试判断目录可写性（两者权限层不同）
 <!-- /CHECKPOINT -->
-
----
 
 ## 笔记
 
@@ -112,10 +66,10 @@ Task: story-001 实现完成并已编译验证，待 /story-done
 按 512×512 等效实测 7.17 ms 外推约 28 ms/步 —— **那个尺寸在 60fps 下不可行**，
 但"尺寸是配置项"这条要求已证实。
 
-**性能（实测 3 轮取中位数，已填入 `project.yaml`）**：256×256 → 2.3643 ms/step（占 16.67ms 预算 14%，三轮 2.1252–2.4511）；
-512×512 等效 → 7.1693 ms/step（43%，三轮 7.0986–7.9899）。不含渲染与蓝图。
+**性能（最终实测，已填入 `project.yaml`）**：256×256 → **2.3787 ms/step**（7.01× 一个 60Hz 帧）；
+512×512 等效 → **7.4621 ms/step**（2.23×）。三轮波动 ~15%（2.1252–2.4511），**单次采样不算测量**。
+benchmark 的帧预算与基准格数现从参数读取，不再硬编码 —— 见 story-001 的 Completion Notes。不含渲染与蓝图。
 
-<!-- /CHECKPOINT -->
 
 ---
 
@@ -236,6 +190,18 @@ Task: story-001 实现完成并已编译验证，待 /story-done
 - `production/epics/index.md` **不存在** → `/create-stories` Step 6 规定此时打印
   `Epics index not updated: production/epics/index.md absent` 然后继续，**不要建它**（格式无出处）
 
+### ⚠️ 维护这个文件时别再犯的错（2026-10-06 我犯过）
+
+我写了一个脚本，用**标记字符串**去定位 `active.md` 的 CHECKPOINT 区间来替换它。
+结果 `str.replace` 命中了头部注释里**引用**那句标记的位置 —— 文件被写出
+**三个重复的 STATUS/CHECKPOINT 块**，标记文字也被撕成
+`结束标记 + 反引号之后的叙事…`。`session-start.sh` / `pre-compact.sh` 直接解析这个文件，
+所以那是真损坏，不是排版问题。
+
+**规则：改这个文件就整块重写，不要按标记字符串做区间替换。**
+若必须用脚本，用**行号**定位，且替换后立即 grep 确认标记恰好 4 处
+（`^<!-- STATUS -->$`、`^<!-- /STATUS -->$`、`^<!-- CHECKPOINT -->$`、`^<!-- /CHECKPOINT -->$`）。
+
 ### 版本控制
 
 - 仓库**已初始化**：`main` ↔ `origin/main`。首次推送 `5f947f0`（260 文件 / 2.5M）。
@@ -265,3 +231,4 @@ UE 5.8 自带实验插件 `ModelContextProtocol`（**不自动启动**）。打�
 - `docs/architecture/adr-0001-composition-model.md` —— 组合模型实现合同
 - `docs/engine-reference/unreal/VERSION.md` —— 引擎 pin 与风险等级（**HIGH**，5.8 超出训练截止）
 - `project.yaml` —— 所有配置的单一真源
+
