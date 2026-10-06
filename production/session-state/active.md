@@ -15,7 +15,7 @@
 -->
 
 <!-- STATUS -->
-Epic: settlement-core
+Epic: reactor
 Feature:
 Task: 等待 ADR-0001 升 Accepted（story-003/004 被阻塞）
 <!-- /STATUS -->
@@ -23,7 +23,7 @@ Task: 等待 ADR-0001 升 Accepted（story-003/004 被阻塞）
 <!-- CHECKPOINT -->
 **Updated:** 2026-10-06
 **Branch:** `main`
-**Current task:** `/setup-engine` 已完成；`/create-stories` 已切出 Build order 第 1 步的 4 个故事（`production/epics/settlement-core/`）。现在停在决策点等用户把 ADR-0001 升 `Accepted`。
+**Current task:** `/setup-engine` 已完成；`/create-stories` 已切出 Build order 第 1 步的 4 个故事（`production/epics/reactor/`）。现在停在决策点等用户把 ADR-0001 升 `Accepted`。
 **Next step:** 开工 `story-001-数据驱动的结算内核与网格.md`（**它不被阻塞，可立即开始**），或先升 ADR-0001 以解锁完整链条。
 **Blocked on:** `story-003` 与 `story-004` 被 **ADR-0001 处于 `Proposed`** 阻塞 —— `dev-story`/`story-readiness` 在所有档位对此拦截。解除 = 用户本人将其 `Status` 改为 `Accepted`。
 **Files in progress:** none
@@ -64,7 +64,7 @@ Task: 等待 ADR-0001 升 Accepted（story-003/004 被阻塞）
 **核心玩法**：你从几样基础物质开始定规则，把规则封成部件、把部件封成工厂，一层层往上调用。
 **MVP 命门**：第 5 项「部件 / 工厂：封装」—— brief 自述"全游戏成不成立就看这一步"。
 
-### 已切出的 4 个故事（`production/epics/settlement-core/`）
+### 已切出的 4 个故事（`production/epics/reactor/`）
 
 | 故事 | 阻塞？ | 内容 |
 |---|---|---|
@@ -119,17 +119,30 @@ Task: 等待 ADR-0001 升 Accepted（story-003/004 被阻塞）
 **命令验证状态**：`smoke` **已验证 EXIT=0**（端到端，经框架自己的解析器取值后执行）；
 `build` / `test` **未验证**（前者受沙箱写权限限制，后者因零测试）。
 
+### CCGS skill 的实际位置（**我为此误判过一次，记下来免得再错**）
+
+**CCGS 的 112 个 skill 在 `C:\Users\14665\.dsh\skills`** —— 每个是标准 `SKILL.md`（部分还有 `CONTRACT.md`）：
+`setup-engine` `create-stories` `create-epics` `dev-story` `story-done` `adopt` `brainstorm`
+`gate-check` `architecture-decision` `architecture-review` …
+
+- ⚠️ **`skill_load` 工具加载不了它们** —— 那个工具只认本 session 的 skill 目录，而那里是**另一套无关 skill**
+  （`autoplan`/`ship`/`ios-*`）。**要读 CCGS 的 skill 就直接 `read` 那两个文件。**
+- **不要再查 `~/.claude/skills`** —— 那里不是 CCGS。我第一次就是这样误判"CCGS 没装"的。
+- 本 repo 的 `.claude/` **不是** skill 目录，它是 CCGS 的**配置**（agents / rules / hooks / docs）。
+
 ### 框架文件的已知缺口（**不要假装它们存在**）
 
-- **`.claude/scripts/` 整个目录不存在** → `project-coherence.sh`、`rotate-session-state.sh` 都没有
-- **`.claude/skills/` 不存在** —— CCGS 的 skill 完全没装（全局 skill 目录里是另一套：`autoplan`/`ship`/`ios-*`）
-  → `/setup-engine`、`/create-stories` 这类斜杠命令**在本 repo 无法作为命令执行**。
-  但它们的规则可以从 `.claude/docs/effects-map.md` 读到并照做（这次就是这么干的）
-- `.claude/statusline.sh` 被 `settings.json` 引用，但**文件不在**
+- **`.claude/scripts/` 整个目录不存在** → `project-coherence.sh`、`rotate-session-state.sh` 都没有。
+  但注意：CCGS skill 的 `allowed-tools` 里写着 `bash "*/.claude/skills/create-stories/../../hooks/yaml-helper.sh"`
+  —— 这个路径**能解析到本 repo**（`.claude/hooks/yaml-helper.sh` 存在），所以配置读取链路是通的。
+- `.claude/statusline.sh` 被 `settings.json` 引用，但**文件不在** → statusline 不会生效
+- `production/epics/index.md` **不存在** → `/create-stories` Step 6 规定此时打印
+  `Epics index not updated: production/epics/index.md absent` 然后继续，**不要建它**（格式无出处）
 
 ### 版本控制
 
-- 仓库**已初始化并推送成功**：`main` ↔ `origin/main` 对齐在 commit `5f947f0`
+- 仓库**已初始化**：`main` ↔ `origin/main`。首次推送 `5f947f0`（260 文件 / 2.5M）。
+  之后每次改动都追加以保持备份连续 —— **开工前先 `git status` 确认没有未提交的设计改动**
 - **260 文件 / 2.5M**，零二进制。`.gitignore` 排除了 `Intermediate/`(2.7G) / `Binaries/`(60M) /
   `Saved/` / `DerivedDataCache/` / `.vs/` / 全部 `*.sln`
 - `.gitattributes` 统一行尾为 LF（224 个 md 是主体），并给 UE 资产类型标了 `binary`
@@ -151,7 +164,7 @@ UE 5.8 自带实验插件 `ModelContextProtocol`（**不自动启动**）。打�
 ### 相关文件
 
 - `production/handoff-2026-10-05.md` —— 决策记录 + 为什么（引擎选型理由、性能测算、数据驱动约定、UE MCP 细节）
-- `production/epics/settlement-core/story-00{1,2,3,4}-*.md` —— Build order 第 1 步的 4 个故事
+- `production/epics/reactor/story-00{1,2,3,4}-*.md` —— Build order 第 1 步的 4 个故事
 - `docs/architecture/adr-0001-composition-model.md` —— 组合模型实现合同
 - `docs/engine-reference/unreal/VERSION.md` —— 引擎 pin 与风险等级（**HIGH**，5.8 超出训练截止）
 - `project.yaml` —— 所有配置的单一真源
