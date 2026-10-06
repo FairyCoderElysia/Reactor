@@ -65,13 +65,21 @@ desktop.ini
 Saved/
 EditorPerProjectUserSettings.ini
 
+# ── 框架 / 工具 / 本地快照（2026-10-06 由用户指定排除）──────────────────────
+# 这三个都是【本机配置】而非游戏内容：备份的目的只是游戏本身，它们可重建或被别处管理。
+# 注意：排除只对之后的提交生效 —— 它们已经在 b0494a9 等历史提交里，git 历史仍存有副本。
+# 若要彻底从远端抹掉，需要重写历史（filter-repo / filter-branch），那是破坏性操作。
+.claude/
+.codegraph/
+.backups/
+
 # ── 刻意【不】忽略的东西（写在这里以免以后有人误加）────────────────────────
 # !Reactor.uproject        ← 工程描述，必须提交
 # !Config/                ← DefaultEngine.ini / DefaultGame.ini / DefaultInput.ini 是工程设定
 # !Source/                ← 游戏源码，本仓库的核心
 # !Content/               ← 游戏资产（当前为空；一旦有资产就是不可再生数据）
 # !design/ !docs/ !production/   ← 设计文档与决策记录
-# !.claude/               ← CCGS 框架配置（仅 1.9M 纯文本：agents/rules/hooks/docs）
 # !project.yaml !CLAUDE.md       ← 配置与本项目上下文
-# !.backups/              ← 设计文档改版前的快照（仅 20K，丢了就没了）
 # !.vsconfig              ← VS 工作负载描述，不含机器专有信息
+#
+# 上列之外，任何"引擎能重新生成"或"只对本机有意义"的东西都不该进仓库。

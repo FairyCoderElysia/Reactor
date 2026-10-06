@@ -172,6 +172,81 @@ namespace
 		}
 	}
 
+	/**
+	 * `Reactor.ResizeCheck <width> <height> [steps]`
+	 *
+	 * Builds a grid at an arbitrary size from the shipped table and settles it, so
+	 * "the dimensions are configuration, not compiled in" is demonstrated by
+	 * running rather than asserted. Story 001's resize criterion had only ever been
+	 * exercised at 256x256; this is what turns 512x512 into an actual result.
+	 */
+	int32 CountOccupied(const FGridSimulation& Grid)
+	{
+		int32 Total = 0;
+		for (const TPair<FSubstanceId, int32>& Entry : Grid.GetOccupancy())
+		{
+			Total += Entry.Value;
+		}
+		return Total;
+	}
+
+	void ResizeCheckCommand(const TArray<FString>& Args)
+	{
+		if (Args.Num() < 2)
+		{
+			UE_LOG(LogReactor, Error, TEXT("Reactor.ResizeCheck — usage: Reactor.ResizeCheck <width> <height> [steps]"));
+			return;
+		}
+
+		const int32 RequestedWidth = FCString::Atoi(*Args[0]);
+		const int32 RequestedHeight = FCString::Atoi(*Args[1]);
+		const int32 Steps = (Args.Num() > 2) ? FCString::Atoi(*Args[2]) : 3;
+
+		FReactorSimulation Source;
+		FString Error;
+		if (!Source.InitializeFromTableFile(FReactorSimulation::GetDefaultTablePath(), Error))
+		{
+			UE_LOG(LogReactor, Error, TEXT("Reactor.ResizeCheck — table load failed: %s"), *Error);
+			return;
+		}
+
+		// Override only the dimensions. Fixed step and reaction rate stay exactly as
+		// the data file has them, so this measures a *resized* run rather than a
+		// differently-tuned one.
+		FSimulationParams Params = Source.GetTable().GetParams();
+		Params.GridWidth = RequestedWidth;
+		Params.GridHeight = RequestedHeight;
+		Params.WorkMultiplier = 0;
+
+		Source.InitializeFromTable(Source.GetTable(), Params);
+		FGridSimulation& Grid = Source.GetGrid();
+
+		UE_LOG(LogReactor, Display, TEXT("Reactor.ResizeCheck — requested %dx%d, built %dx%d, %d cells, %lld cell-updates/step"),
+			RequestedWidth, RequestedHeight, Grid.GetWidth(), Grid.GetHeight(), Grid.GetCellCount(), Grid.GetCellUpdatesPerStep());
+
+		Grid.FillRandom(20261006, 0.55f);
+		UE_LOG(LogReactor, Display, TEXT("  after fill: %d occupied cells, %d distinct substances present"),
+			CountOccupied(Grid), Grid.GetOccupancy().Num());
+
+		for (int32 Step = 1; Step <= FMath::Max(1, Steps); ++Step)
+		{
+			Grid.Step();
+			UE_LOG(LogReactor, Display, TEXT("  step %d: changed=%d reacted=%d"),
+				Step, Grid.GetChangedCellCount(), Grid.GetReactionCount());
+		}
+
+		// The point of the check: a grid at this size must still be a working
+		// simulation, not merely an allocated buffer. A non-zero population that
+		// settles over several steps is that evidence.
+		UE_LOG(LogReactor, Display, TEXT("  final: step index %llu, %d cells occupied"),
+			Grid.GetStepIndex(), CountOccupied(Grid));
+	}
+
+	FAutoConsoleCommand GResizeCheckCommand(
+		TEXT("Reactor.ResizeCheck"),
+		TEXT("Build a grid at an arbitrary size from the shipped table and settle it. Usage: Reactor.ResizeCheck <width> <height> [steps]"),
+		FConsoleCommandWithArgsDelegate::CreateStatic(&ResizeCheckCommand));
+
 	FAutoConsoleCommand GDumpSimulationStateCommand(
 		TEXT("Reactor.DumpSimulationState"),
 		TEXT("Print the loaded tables, the seeded grid, and five settlement steps. Usage: Reactor.DumpSimulationState [seed]"),

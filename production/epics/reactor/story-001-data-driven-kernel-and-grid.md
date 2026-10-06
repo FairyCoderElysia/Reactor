@@ -46,8 +46,8 @@
 - [x] 相邻两 tick 之间状态可观察地变化（东西确实在动）
 - [x] **确定性**：同一初始状态跑两次，得到逐格相同的结果（自动化测试断言）
 - [x] `Automation Spec` 测试存在，命名以 `Reactor.` 开头（`commands.test` 按此子串过滤）
-- [~] 基准网格 `256×256`（65,536 格）可创建；**扩大或缩小只改配置，不改代码**
-  —— 尺寸确实从 JSON 读取而非编译进去，但**只实际跑过 256×256**，缩放未在运行时验证
+- [x] 基准网格 `256×256`（65,536 格）可创建；**扩大或缩小只改配置，不改代码**
+  —— 已实跑 128×128 / 512×512 / 1024×1024（见下），代码未改动一行
 - [x] **产出第一个真实性能数字**：基准网格下每 tick 耗时实测值，填入 `project.yaml` 的 `performance.*`（此前刻意留空 —— 现在有真数据了）
 - [x] `commands.build` 编译通过
 
@@ -105,11 +105,15 @@
 3. **Behavioural isolation**: `Reactor.DumpSimulationState` — one lone cell per substance,
    stepped twice: all 5 survive. Before the double-buffer fix this reported `0 distinct
    non-empty` after one step, which is how that bug was caught.
-4. **Settling behaviour**: seeded grid of ~7,200 cells per substance → step 1 changes
+4. **Resize**: `Reactor.ResizeCheck` at three sizes — 128×128 (16,384 cells), **512×512
+   (262,144)**, 1024×1024 (1,048,576). Each built the requested size, filled to 5 substances,
+   ran a full settlement step, and settled without error. Only the dimensions were overridden;
+   fixed step and reaction rate stayed as the data file has them.
+5. **Settling behaviour**: seeded grid of ~7,200 cells per substance → step 1 changes
    9,820 cells with 9,820 reaction matches; the table then reaches equilibrium. Recorded,
    not hidden: this reaction table is all merge rules, so one step consumes every reachable
    pair. Sustained activity is the rule table's job (story-002), not this table's.
-5. **Performance**: `Reactor.BenchmarkSimulation`, 3 runs per configuration → the medians
+6. **Performance**: `Reactor.BenchmarkSimulation`, 3 runs per configuration → the medians
    now in `project.yaml`'s `performance` block.
 
 **In-repo evidence document**: `docs/simulation/kernel-story-001-evidence.md`

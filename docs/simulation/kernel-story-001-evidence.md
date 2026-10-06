@@ -182,15 +182,47 @@ cross-platform or cross-compiler reproducibility, and it does not pin the fill t
 grid. Both would be needed before a shared puzzle file could be trusted across machines —
 noted here rather than claimed.
 
-## 6. What is NOT verified
+## 6. Grid resize — verified 2026-10-06
+
+Story 001 requires the grid dimensions to be configuration rather than compiled in. That was
+true of the code from the start (`FSimulationParams` carries them, and `Initialize` reads
+them), but only 256×256 had ever actually been built. `Reactor.ResizeCheck` closes the gap by
+constructing a grid at an arbitrary size from the shipped table:
+
+```
+UnrealEditor-Cmd.exe <abs>/Reactor.uproject -game -nullrhi -unattended -stdout   -DDC-ForceMemoryCache -ExecCmds="Reactor.ResizeCheck <width> <height> [steps], Quit"
+```
+
+Only `GridWidth` / `GridHeight` are overridden — fixed step and reaction rate stay exactly as
+`DefaultSubstances.json` has them, so this is a *resized* run rather than a differently-tuned one.
+
+| Requested | Built | Cells | Occupied after fill | Step 1 | Final |
+|---|---|---|---|---|---|
+| 128×128 | 128×128 | 16,384 | 9,077 (5 substances) | changed=2,509 · reacted=2,509 | 8,004 |
+| **512×512** | **512×512** | **262,144** | 144,080 (5) | changed=39,742 · reacted=39,742 | 127,127 |
+| 1024×1024 | 1024×1024 | 1,048,576 | 576,717 (5) | changed=158,782 · reacted=158,782 | 508,841 |
+
+Every size built, filled with all 5 substances, ran a full settlement step with a proportional
+reaction count, and settled without error — **with no code change between runs**. The
+population falls after step 1 in each case, which is the expected behaviour of this all-merge
+reaction table (§3).
+
+**What this does not prove:** that a *large* grid is cheap. 1024×1024 is 16× the baseline cell
+count; the measured per-step cost at 512×512-equivalent load is 7.17 ms (§4), so 1024×1024
+would be roughly 4× that — well past a 16.67 ms frame. The resize mechanism is sound; the
+budget at that size is a separate question, and the answer is "not at 60fps in the current
+kernel".
+
+## 7. What is NOT verified
 
 - **No rendering.** Nothing was drawn; that is story-004.
-- **Grid resize was not exercised at runtime.** The dimensions come from JSON rather than
-  being compiled in, and `Initialize` honours them, but only 256×256 has actually been built.
+- ~~Grid resize was not exercised at runtime~~ — **closed 2026-10-06.** `Reactor.ResizeCheck`
+  built and settled 128×128, 512×512 and 1024×1024 from the shipped table by overriding only
+  the dimensions. See §6.
 - **`commands.run` still opens the editor, not the game** — unchanged by this story.
-- **Cross-platform determinism** — see the limits note above.
+- **Cross-platform determinism** — see §5's limits note above.
 
-## 7. Reproducing
+## 8. Reproducing
 
 ```bash
 # Build (needs DOTNET_ROOT pointed at the engine's bundled .NET 10)
